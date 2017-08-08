@@ -11,8 +11,10 @@ function calendarHeatmap() {
   var now = moment().endOf('day').toDate();
   var yearAgo = moment().startOf('day').subtract(1, 'year').toDate();
   var startDate = null;
+  var endDate = null;
   var data = [];
   var max = null;
+  var emptyColor = '#EDEDED';
   var colorRange = ['#D8E6E7', '#218380'];
   var tooltipEnabled = true;
   var tooltipUnit = 'contribution';
@@ -94,8 +96,18 @@ function calendarHeatmap() {
 
     d3.select(chart.selector()).selectAll('svg.calendar-heatmap').remove(); // remove the existing chart, if it exists
 
-    var dateRange = d3.time.days(yearAgo, now); // generates an array of date objects within the specified range
-    var monthRange = d3.time.months(moment(yearAgo).startOf('month').toDate(), now); // it ignores the first month if the 1st date is after the start of the month
+    // Start should be the beginning of our data
+    var startDate = chart.data()[0].date || yearAgo
+
+    // End date should be end of data - or at least 1 year from start
+    var endDate = chart.data()[chart.data().length - 1].date || now
+    var oneYearAfterStart = moment(startDate).add('1', 'year')
+    if(endDate < oneYearAfterStart)
+      endDate = oneYearAfterStart
+
+    var dateRange = d3.time.days(startDate, endDate); // generates an array of date objects within the specified range
+    var monthRange = d3.time.months(moment(startDate).startOf('month').toDate(), endDate); // it ignores the first month if the 1st date is after the start of the month
+
     var firstDate = moment(dateRange[0]);
     if (max === null) { max = d3.max(chart.data(), function (d) { return d.count; }); } // max data value
 
@@ -125,7 +137,16 @@ function calendarHeatmap() {
         .attr('class', 'day-cell')
         .attr('width', SQUARE_LENGTH)
         .attr('height', SQUARE_LENGTH)
-        .attr('fill', function(d) { return color(countForDate(d)); })
+        .attr('fill', function(d) {
+          var countDate = countForDate(d)
+          if (countDate == 0) {
+            // Value for zero activity
+            return emptyColor;
+          }
+          else {
+            return color(countDate);
+          }
+        })
         .attr('x', function (d, i) {
           var cellDate = moment(d);
           var result = cellDate.week() - firstDate.week() + (firstDate.weeksInYear() * (cellDate.weekYear() - firstDate.weekYear()));
@@ -272,7 +293,12 @@ function calendarHeatmap() {
     dayRects.filter(function (d) {
       return daysOfChart.indexOf(d.toDateString()) > -1;
     }).attr('fill', function (d, i) {
-      return color(chart.data()[i].count);
+      var countDate = chart.data()[i].count;
+      if (countDate == 0) {
+        return emptyColor;
+      } else {
+        return color(chart.data()[i].count);
+      }
     });
   }
 
